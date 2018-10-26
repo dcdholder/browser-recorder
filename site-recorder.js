@@ -1,11 +1,12 @@
 require('chromedriver');
 
-const {Builder, By, Key, until} = require('selenium-webdriver');
+const {Builder, Capabilities, By, Key, until} = require('selenium-webdriver');
 const child_process             = require('child_process');
 
 const SOURCE        = 'http://www.google.ca';
 const SCREEN_NUMBER = 5;
-const RESOLUTION    = '1920x1080';
+const RES_WIDTH     = '1920';
+const RES_HEIGHT    = '1080';
 const FRAMERATE     = 30;
 
 class SiteRecorder {
@@ -16,7 +17,13 @@ class SiteRecorder {
   start() {
     if (!this.started) {
       return this.startXvfbProcess().then(() => {
-        this.driver = new Builder().forBrowser('chrome').build();
+        let chromeCapabilities = Capabilities.chrome();
+        let chromeOptions      = {
+            'args': ['--start-fullscreen', `window-size=${RES_WIDTH},${RES_HEIGHT}`]
+        };
+        chromeCapabilities.set('chromeOptions', chromeOptions);
+
+        this.driver = new Builder().withCapabilities(chromeCapabilities).build();
         this.driver.get(this.url);
 
         return this.startFfmpegProcess();
@@ -51,7 +58,7 @@ class SiteRecorder {
         `:${SCREEN_NUMBER}`,
         `-screen`,
         `0`,
-        `${RESOLUTION}x24`
+        `${RES_WIDTH}x${RES_HEIGHT}x24`
       ];
 
       this.xvfbProcess = child_process.spawn(cmd,args);
@@ -84,7 +91,7 @@ class SiteRecorder {
       let args = [
         `-y`,
         `-video_size`,
-        `${RESOLUTION}`,
+        `${RES_WIDTH}x${RES_HEIGHT}`,
         `-framerate`,
         `${FRAMERATE}`,
         `-f`,
