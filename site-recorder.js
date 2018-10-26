@@ -1,25 +1,28 @@
-const webdriver     = require('selenium-webdriver');
-const child_process = require('child_process');
+require('chromedriver');
 
-const SOURCE        = 'www.google.ca';
+const {Builder, By, Key, until} = require('selenium-webdriver');
+const child_process             = require('child_process');
+
+const SOURCE        = 'http://www.google.ca';
 const SCREEN_NUMBER = 5;
 const RESOLUTION    = '1920x1080';
 const FRAMERATE     = 30;
 
 class SiteRecorder {
+  constructor(url) {
+    this.url = url;
+  }
+
   start() {
     if (!this.started) {
       return this.startXvfbProcess().then(() => {
-        return new Builder().forBrowser('firefox').build();
-      }).then((driver) => {
-        this.driver = driver;
+        this.driver = new Builder().forBrowser('chrome').build();
+        this.driver.get(this.url);
 
-        return this.driver.get(this.url);
-      }).then(() => {
         return this.startFfmpegProcess();
+      }).then(() => {
+        this.started = true;
       });
-
-      this.started = true;
     } else {
       return Promise.reject('Site recording already started');
     }
@@ -52,6 +55,7 @@ class SiteRecorder {
       ];
 
       this.xvfbProcess = child_process.spawn(cmd,args);
+
       return Promise.resolve();
     } else {
       return Promise.reject('Xvbf process already running');
@@ -87,12 +91,12 @@ class SiteRecorder {
         `x11grab`,
         `-i`,
         `:${SCREEN_NUMBER}.0`,
-        `-i`,
-        `default`,
-        `/tmp/${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`
+        '/tmp/dvrtest.mp4'
       ];
 
       this.ffmpegProcess = child_process.spawn(cmd,args);
+
+      return Promise.resolve();
     } else {
       return Promise.reject('Ffmpeg process already running');
     }
@@ -120,7 +124,7 @@ class SiteRecorder {
 }
 
 const RECORD_TIME  = 3000;
-let   siteRecorder = new SiteRecorder();
+let   siteRecorder = new SiteRecorder(SOURCE);
 
 siteRecorder.start().then(() => {
   return new Promise((resolve,reject) => {
