@@ -1,25 +1,20 @@
-const Xvfb      = require('xvfb');
-const webdriver = require('selenium-webdriver');
-const browser   = require('selenium-webdriver/chrome');
-const ffmpeg    = require('fluent-ffmpeg');
+const webdriver     = require('selenium-webdriver');
+const browser       = require('selenium-webdriver/chrome');
+const child_process = require('child_process');
 
-const OUTPUT_FILENAME = './video.mp4';
-const RECORDING_URL   = 'www.google.ca'; //process.env.RECORDING_URL;
-const RECORDING_TIME  = 3;               //process.env.RECORDING_TIME;
-const RECORDING_RES   = '1920x1080';
-
-//might need to specify framebuffer id in the ffmpeg thing
-//which framebuffer does the browser use?
+const SOURCE        = 'www.google.ca';
+const SCREEN_NUMBER = 5;
+const RESOLUTION    = '1920x1080';
+const FRAMERATE     = 30;
 
 class SiteRecorder {
-  constructor() {
-    this.started = false;
-    this.xvfb    = new Xvfb();
-  }
-
   start() {
     if (!this.started) {
-      return this.xvfb.start().then(() => {
+      return new Promise((resolve,reject) => {
+        this.xvfb.start(() => {
+          resolve();
+        });
+      }).then(() => {
         return browser.get(this.url);
       }).then(() => {
         return startFfmpegProcess();
@@ -45,12 +40,43 @@ class SiteRecorder {
     }
   }
 
+  startXvfbProcess() {
+    if (!this.xvfbProcess) {
+      let cmd = `Xvfb :${SCREEN_NUMBER} -screen 0 ${RESOLUTION}x24`;
+
+      this.xvfbProcess = child_process.spawn(cmd);
+      return Promise.resolve();
+    } else {
+      return Promise.reject('Xvbf process already running');
+    }
+  }
+
+  stopXvfbProcess() {
+    if (this.xvfbProcess) {
+      return new Promise((resolve,reject) => {
+        this.xvfbProcess.on('close', (code) => {
+          resolve();
+        });
+
+        this.xvfbProcess.kill('SIGINT');
+      }).then(() => {
+        this.xvfbProcess = null;
+      });
+    } else {
+      return Promise.reject('Xvfb process not running');
+    }
+  }
+
   startFfmpegProcess() {
     if (!this.ffmpegProcess) {
-      let screenBuffer = 'x11grab';
-      let inputOptions = [`-f ${screenBuffer}`];
+      let cmd = `ffmpeg -y \
+                -video_size ${RESOLUTION} \
+                -framerate ${FRAMERATE} \
+                -f x11grab \
+                -i :${SCREEN_NUMBER}.0 \
+                -i default \\tmp\\${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`;
 
-      //TODO: create the ffmpeg process
+      this.ffmpegProcess = child_process.spawn(cmd);
     } else {
       return Promise.reject('Ffmpeg process already running');
     }
@@ -58,13 +84,12 @@ class SiteRecorder {
 
   stopFfmpegProcess() {
     if (this.ffmpegProcess) {
-      //TODO: fill this in
       return new Promise((resolve,reject) => {
         this.ffmpegProcess.on('close', (code) => {
           resolve();
         });
 
-        ffmpegProcess.kill(ffmpegProcess.pid,'SIGINT');
+        this.ffmpegProcess.kill('SIGINT');
       }).then(() => {
         this.ffmpegProcess = null;
       });
@@ -73,7 +98,18 @@ class SiteRecorder {
     }
   }
 
-  uploadVideo() {
+  uploadVideo(uploadTarget) {
     return Promise.resolve(); //TODO: fill this in
   }
 }
+
+const RECORD_TIME  = 3000;
+let   siteRecorder = new SiteRecorder();
+
+siteRecorder.start().then(() => {
+  return new Promise((resolve,reject) => {
+    setTimeout(() => {resolve();}, RECORD_TIME);
+  });
+}).then(() => {
+  return siteRecorder.stop();
+});
