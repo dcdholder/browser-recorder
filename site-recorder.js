@@ -1,5 +1,4 @@
 const webdriver     = require('selenium-webdriver');
-const browser       = require('selenium-webdriver/chrome');
 const child_process = require('child_process');
 
 const SOURCE        = 'www.google.ca';
@@ -10,14 +9,14 @@ const FRAMERATE     = 30;
 class SiteRecorder {
   start() {
     if (!this.started) {
-      return new Promise((resolve,reject) => {
-        this.xvfb.start(() => {
-          resolve();
-        });
+      return this.startXvfbProcess().then(() => {
+        return new Builder().forBrowser('firefox').build();
+      }).then((driver) => {
+        this.driver = driver;
+
+        return this.driver.get(this.url);
       }).then(() => {
-        return browser.get(this.url);
-      }).then(() => {
-        return startFfmpegProcess();
+        return this.startFfmpegProcess();
       });
 
       this.started = true;
@@ -28,10 +27,12 @@ class SiteRecorder {
 
   stop(uploadTarget) {
     if (this.started) {
-      return this.xvfb.stop().then(() => {
-        return stopFfmpegProcess();
+      return this.stopFfmpegProcess().then(() => {
+        return this.driver.quit();
       }).then(() => {
-        return uploadVideo(uploadTarget);
+        return this.stopXvfbProcess();
+      }).then(() => {
+        return this.uploadVideo(uploadTarget);
       });
 
       this.started = false;
@@ -42,9 +43,15 @@ class SiteRecorder {
 
   startXvfbProcess() {
     if (!this.xvfbProcess) {
-      let cmd = `Xvfb :${SCREEN_NUMBER} -screen 0 ${RESOLUTION}x24`;
+      let cmd  = 'Xvfb';
+      let args = [
+        `:${SCREEN_NUMBER}`,
+        `-screen`,
+        `0`,
+        `${RESOLUTION}x24`
+      ];
 
-      this.xvfbProcess = child_process.spawn(cmd);
+      this.xvfbProcess = child_process.spawn(cmd,args);
       return Promise.resolve();
     } else {
       return Promise.reject('Xvbf process already running');
@@ -69,14 +76,23 @@ class SiteRecorder {
 
   startFfmpegProcess() {
     if (!this.ffmpegProcess) {
-      let cmd = `ffmpeg -y \
-                -video_size ${RESOLUTION} \
-                -framerate ${FRAMERATE} \
-                -f x11grab \
-                -i :${SCREEN_NUMBER}.0 \
-                -i default \\tmp\\${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`;
+      let cmd  = 'ffmpeg';
+      let args = [
+        `-y`,
+        `-video_size`,
+        `${RESOLUTION}`,
+        `-framerate`,
+        `${FRAMERATE}`,
+        `-f`,
+        `x11grab`,
+        `-i`,
+        `:${SCREEN_NUMBER}.0`,
+        `-i`,
+        `default`,
+        `\\tmp\\${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`
+      ];
 
-      this.ffmpegProcess = child_process.spawn(cmd);
+      this.ffmpegProcess = child_process.spawn(cmd,args);
     } else {
       return Promise.reject('Ffmpeg process already running');
     }
