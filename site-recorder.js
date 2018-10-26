@@ -89,7 +89,7 @@ class SiteRecorder {
         `:${SCREEN_NUMBER}.0`,
         `-i`,
         `default`,
-        `\\tmp\\${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`
+        `/tmp/${SOURCE}_\`date '+%Y-%m-%d_%H-%M-%S'\`.mp4`
       ];
 
       this.ffmpegProcess = child_process.spawn(cmd,args);
